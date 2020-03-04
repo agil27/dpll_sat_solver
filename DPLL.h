@@ -7,6 +7,138 @@
 
 #include "common.h"
 
+class Interpretation {
+private:
+    interp decision;
+    atoms remain;
+
+public:
+    explicit Interpretation(int num_variable) {
+        remain.resize(num_variable);
+        for (int i = 0; i < num_variable; i++) {
+            remain[i] = i + 1;
+        }
+    }
+
+    void remove_remain(int x) {
+        auto iter = std::remove(remain.begin(), remain.end(), x);
+        remain.erase(iter, remain.end());
+    }
+
+    void assign_(literal l) {
+        decision.push_back(l);
+        remove_remain(VAR(l));
+    }
+
+    Interpretation assign(literal l) {
+        Interpretation new_interp = *this;
+        new_interp.assign_(l);
+        return new_interp;
+    }
+
+    int first_atom() {
+        if (remain.empty()) {
+            throw std::logic_error("no remaining atom");
+        }
+        return remain[0];
+    }
+
+    int state(literal l) {
+        for (literal d: decision) {
+            if (l == d) {
+                return 1;
+            }
+            if (-l == d) {
+                return -1;
+            }
+        }
+        return 0;
+    }
+
+    bool belongs(literal l) {
+        return (state(l) == 1);
+    }
+
+    bool satisfy(const clause &c) {
+        for (literal l: c) {
+            if (belongs(l)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool satisfy(const formula &f) {
+        for (const clause &c: f.clauses) {
+            if (!satisfy(c)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool unsatisfy(const clause &c) {
+        for (literal l: c) {
+            if (!belongs(-l)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool unsatisfy(const formula &f) {
+        for (const clause &c: f.clauses) {
+            if (unsatisfy(c)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool unassigned(literal l) {
+        return (!state(l));
+    }
+
+    literal check_unit(const clause &c) {
+        int num_unassigned = 0;
+        literal unit = 0;
+        for (literal l: c) {
+            if (unassigned(l)) {
+                num_unassigned++;
+                unit = l;
+            }
+            if (num_unassigned > 1) {
+                return 0;
+            }
+            if (state(l) == 1) {
+                return 0;
+            }
+        }
+        if (num_unassigned == 1) {
+            return unit;
+        }
+        return 0;
+    }
+
+    literal check_unit(const formula &f) {
+        for (const clause &c: f.clauses) {
+            literal result = check_unit(c);
+            if (result != 0) {
+                return result;
+            }
+        }
+        return 0;
+    }
+
+    model export_model() {
+        model answer;
+        for (literal l: decision) {
+            answer.insert(std::make_pair(VAR(l), POSITIVE(l)));
+        }
+        return answer;
+    }
+};
+
 class DPLL {
 public:
     /**
@@ -15,7 +147,7 @@ public:
      * @param phi the formula to be checked
      * @note Please DON'T CHANGE this signature because the grading script will directly call this function!
      */
-    DPLL(const formula &phi) : phi(phi) {}
+    explicit DPLL(formula phi);
 
     /**
      * Check if the formula is satisfiable.
@@ -37,6 +169,9 @@ public:
 
 private:
     formula phi;
+    Interpretation answer;
+
+    bool dfs(const formula &f, Interpretation d);
 };
 
 
