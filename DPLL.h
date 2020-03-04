@@ -12,14 +12,6 @@ private:
     interp decision;
     atoms remain;
 
-public:
-    explicit Interpretation(int num_variable) {
-        remain.resize(num_variable);
-        for (int i = 0; i < num_variable; i++) {
-            remain[i] = i + 1;
-        }
-    }
-
     void remove_remain(int x) {
         auto iter = std::remove(remain.begin(), remain.end(), x);
         remain.erase(iter, remain.end());
@@ -28,19 +20,6 @@ public:
     void assign_(literal l) {
         decision.push_back(l);
         remove_remain(VAR(l));
-    }
-
-    Interpretation assign(literal l) {
-        Interpretation new_interp = *this;
-        new_interp.assign_(l);
-        return new_interp;
-    }
-
-    int first_atom() {
-        if (remain.empty()) {
-            throw std::logic_error("no remaining atom");
-        }
-        return remain[0];
     }
 
     int state(literal l) {
@@ -68,15 +47,6 @@ public:
         return false;
     }
 
-    bool satisfy(const formula &f) {
-        for (const clause &c: f.clauses) {
-            if (!satisfy(c)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     bool unsatisfy(const clause &c) {
         for (literal l: c) {
             if (!belongs(-l)) {
@@ -84,15 +54,6 @@ public:
             }
         }
         return true;
-    }
-
-    bool unsatisfy(const formula &f) {
-        for (const clause &c: f.clauses) {
-            if (unsatisfy(c)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     bool unassigned(literal l) {
@@ -118,6 +79,45 @@ public:
             return unit;
         }
         return 0;
+    }
+
+public:
+    explicit Interpretation(int num_variable) {
+        remain.resize(num_variable);
+        for (int i = 0; i < num_variable; i++) {
+            remain[i] = i + 1;
+        }
+    }
+
+    Interpretation assign(literal l) {
+        Interpretation new_interp = *this;
+        new_interp.assign_(l);
+        return new_interp;
+    }
+
+    int first_atom() {
+        if (remain.empty()) {
+            throw std::logic_error("no remaining atom");
+        }
+        return remain[0];
+    }
+
+    bool satisfy(const formula &f) {
+        for (const clause &c: f.clauses) {
+            if (!satisfy(c)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool unsatisfy(const formula &f) {
+        for (const clause &c: f.clauses) {
+            if (unsatisfy(c)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     literal check_unit(const formula &f) {
