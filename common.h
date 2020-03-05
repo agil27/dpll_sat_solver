@@ -14,6 +14,7 @@
 #ifndef DPLL_COMMON_H
 #define DPLL_COMMON_H
 
+
 // A literal is a atomic formula (that contains a variable). Like in dimacs,
 // + positive numbers denote the corresponding variables;
 // - negative numbers denote the negations of the corresponding variables.

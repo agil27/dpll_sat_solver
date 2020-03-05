@@ -82,7 +82,11 @@ private:
     }
 
 public:
-    explicit Interpretation(int num_variable) {
+    explicit Interpretation(int num_variable = 0) {
+        init(num_variable);
+    }
+
+    void init(int num_variable) {
         remain.resize(num_variable);
         for (int i = 0; i < num_variable; i++) {
             remain[i] = i + 1;
@@ -139,6 +143,7 @@ public:
     }
 };
 
+
 class DPLL {
 public:
     /**
@@ -171,7 +176,9 @@ private:
     formula phi;
     Interpretation answer;
 
-    bool dfs(const formula &f, Interpretation d);
+    bool dfs(Interpretation d);
+
+    bool dfs_stack();
 };
 
 

@@ -9,32 +9,64 @@
 DPLL::DPLL(formula phi) : phi(std::move(phi)), answer(Interpretation(phi.num_variable)) {}
 
 bool DPLL::check_sat() {
-    return dfs(phi, answer);
+    //return dfs(answer);
+    return dfs_stack();
 }
 
 model DPLL::get_model() {
     return answer.export_model();
 }
 
-bool DPLL::dfs(const formula &f, Interpretation d) {
-    if (d.satisfy(f)) {
+bool DPLL::dfs_stack() {
+    std::stack<Interpretation> s;
+    s.push(answer);
+    while (!s.empty()) {
+        Interpretation d = s.top();
+        s.pop();
+        if (d.satisfy(phi)) {
+            answer = d;
+            return true;
+        }
+        if (d.unsatisfy(phi)) {
+            continue;
+        }
+        literal unit = d.check_unit(phi);
+        if (unit) {
+            if (DEBUG) {
+                printf("[trace] found unit %d\n", unit);
+            }
+            s.push(d.assign(unit));
+            continue;
+        }
+        literal split = d.first_atom();
+        if (DEBUG) {
+            printf("[trace] split on %d\n", split);
+        }
+        s.push(d.assign(-split));
+        s.push(d.assign(split));
+    }
+    return false;
+}
+
+bool DPLL::dfs(Interpretation d) {
+    if (d.satisfy(phi)) {
         answer = d;
         return true;
     }
-    if (d.unsatisfy(f)) {
+    if (d.unsatisfy(phi)) {
         return false;
     }
-    literal unit = d.check_unit(f);
+    literal unit = d.check_unit(phi);
     if (unit) {
         if (DEBUG) {
             printf("[trace] found unit %d\n", unit);
         }
-        return dfs(f, d.assign(unit));
+        return dfs(d.assign(unit));
     }
     literal split = d.first_atom();
     if (DEBUG) {
         printf("[trace] split on %d\n", split);
     }
-    return (dfs(f, d.assign(-split)) || dfs(f, d.assign(split)));
+    return (dfs(d.assign(split)) || dfs(d.assign(-split)));
 }
 
