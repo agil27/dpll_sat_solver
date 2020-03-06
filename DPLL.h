@@ -224,7 +224,7 @@ private:
     void pop_() {
         literal removed = decision.back();
         decision.pop_back();
-        remove_remain(VAR(removed));
+        remain.push_back(VAR(removed));
     }
 
 public:

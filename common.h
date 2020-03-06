@@ -11,6 +11,7 @@
 #include <utility>
 #include <algorithm>
 #include <memory>
+#include <iostream>
 
 #ifndef DPLL_COMMON_H
 #define DPLL_COMMON_H

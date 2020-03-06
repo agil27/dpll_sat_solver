@@ -75,6 +75,7 @@ bool DPLL::dfs_backjump(Interpretation d, literal last_decide, int decide_level)
     if (last_decide != 0) {
         gamma.setDecision(last_decide, decide_level);
     }
+
     if (d.satisfy(phi)) {
         answer = d;
         return true;
@@ -104,9 +105,6 @@ bool DPLL::dfs_backjump(Interpretation d, literal last_decide, int decide_level)
             printf("[trace] found unit %d\n", unit);
         }
         return dfs_backjump(d.assign(unit), 0, 0);
-    }
-    if (d.exhausted()) {
-        return false;
     }
     literal split = d.first_atom();
     if (DEBUG) {
