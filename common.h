@@ -24,7 +24,7 @@ typedef int literal;
 #define POSITIVE(x) ((x) > 0)
 #define NEGATIVE(x) ((x) < 0)
 #define VAR(x) (((x) > 0) ? (x) : (-(x)))
-#define DEBUG true
+#define DEBUG false
 
 // A clause is a list of literals (meaning their disjunction).
 typedef std::vector<literal> clause;

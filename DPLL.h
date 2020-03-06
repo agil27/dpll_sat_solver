@@ -321,8 +321,8 @@ public:
         return decision.back();
     }
 
-    bool empty() {
-        return decision.empty();
+    bool exhausted() {
+        return remain.empty();
     }
 };
 

@@ -105,7 +105,7 @@ bool DPLL::dfs_backjump(Interpretation d, literal last_decide, int decide_level)
         }
         return dfs_backjump(d.assign(unit), 0, 0);
     }
-    if (d.empty()) {
+    if (d.exhausted()) {
         return false;
     }
     literal split = d.first_atom();
