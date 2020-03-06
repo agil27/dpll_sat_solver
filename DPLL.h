@@ -7,6 +7,114 @@
 
 #include "common.h"
 
+struct ImplicationGraph {
+    std::vector<int> decisions;
+    std::vector<int> parity;
+    std::vector<std::vector<bool>> adjacent;
+    int last_atom;
+    int num_variables;
+
+    explicit ImplicationGraph(int num_variables) : last_atom(0), num_variables(num_variables) {
+        decisions.resize(num_variables + 1);
+        adjacent.resize(num_variables + 1);
+        parity.resize(num_variables + 1);
+        for (int i = 0; i <= num_variables; i++) {
+            decisions[i] = 0;
+            parity[i] = 0;
+            adjacent[i].resize(num_variables + 1);
+            for (int j = 0; j <= num_variables; j++) {
+                adjacent[i][j] = false;
+            }
+        }
+    }
+
+    void connect(literal from, literal to) {
+        adjacent[VAR(from)][VAR(to)] = true;
+        last_atom = VAR(to);
+    }
+
+    void setDecision(literal l, int d) {
+        decisions[VAR(l)] = d;
+        parity[VAR(l)] = l;
+    }
+
+    void span(const clause &c, literal unit) {
+        int latest_decision = 0;
+        for (literal l: c) {
+            if (VAR(l) != VAR(unit)) {
+                connect(l, unit);
+                if (decisions[VAR(l)] > latest_decision) {
+                    latest_decision = decisions[VAR(l)];
+                }
+            }
+        }
+        setDecision(unit, latest_decision);
+    }
+
+    void clear(int i) {
+        for (int j = 0; j <= num_variables; j++) {
+            adjacent[i][j] = false;
+            adjacent[j][i] = false;
+        }
+        decisions[i] = 0;
+        parity[i] = 0;
+    }
+
+    void tidyup(const std::vector<literal> &m) {
+        std::vector<bool> appear;
+        appear.resize(num_variables + 1);
+        for (int i = 0; i <= num_variables; i++) {
+            appear[i] = false;
+        }
+        for (literal l: m) {
+            appear[VAR(l)] = true;
+        }
+        for (int i = 1; i <= num_variables; i++) {
+            if (!appear[i]) {
+                clear(i);
+            }
+        }
+    }
+
+    std::pair<int, int> find_reason() {
+        std::stack<int> s;
+        s.push(last_atom);
+        std::vector<bool> visited;
+        visited.resize(num_variables + 1);
+        for (int i = 0; i <= num_variables; i++) {
+            visited[i] = false;
+        }
+        std::vector<int> ans;
+        while (!s.empty()) {
+            int x = s.top();
+            s.pop();
+            bool hasPrev = false;
+            for (int i = 1; i <= num_variables; i++) {
+                if (i != x && adjacent[i][x]) {
+                    hasPrev = true;
+                    if (!visited[i]) {
+                        s.push(i);
+                        visited[i] = true;
+                    }
+                }
+            }
+            if (!hasPrev) {
+                ans.push_back(x);
+            }
+        }
+        if (ans.size() >= 2) {
+            if (decisions[ans[0]] >= decisions[ans[1]]) {
+                return std::make_pair(ans[0], ans[1]);
+            } else {
+                return std::make_pair(ans[1], ans[0]);
+            }
+        } else {
+            return std::make_pair(0, 0);
+        }
+    }
+};
+
+
 class Interpretation {
 private:
     interp decision;
@@ -56,6 +164,16 @@ private:
         return true;
     }
 
+    bool unsatisfy_backjump(const clause &c, ImplicationGraph &g) {
+        for (literal l: c) {
+            if (!belongs(-l)) {
+                return false;
+            }
+        }
+        g.span(c, g.last_atom);
+        return true;
+    }
+
     bool unassigned(literal l) {
         return (!state(l));
     }
@@ -81,6 +199,34 @@ private:
         return 0;
     }
 
+    literal check_unit_backjump(const clause &c, ImplicationGraph &g) {
+        int num_unassigned = 0;
+        literal unit = 0;
+        for (literal l: c) {
+            if (unassigned(l)) {
+                num_unassigned++;
+                unit = l;
+            }
+            if (num_unassigned > 1) {
+                return 0;
+            }
+            if (state(l) == 1) {
+                return 0;
+            }
+        }
+        if (num_unassigned == 1) {
+            g.span(c, unit);
+            return unit;
+        }
+        return 0;
+    }
+
+    void pop_() {
+        literal removed = decision.back();
+        decision.pop_back();
+        remove_remain(VAR(removed));
+    }
+
 public:
     explicit Interpretation(int num_variable = 0) {
         init(num_variable);
@@ -96,6 +242,12 @@ public:
     Interpretation assign(literal l) {
         Interpretation new_interp = *this;
         new_interp.assign_(l);
+        return new_interp;
+    }
+
+    Interpretation pop() {
+        Interpretation new_interp = *this;
+        new_interp.pop_();
         return new_interp;
     }
 
@@ -124,9 +276,28 @@ public:
         return false;
     }
 
+    bool unsatisfy_backjump(const formula &f, ImplicationGraph &g) {
+        for (const clause &c: f.clauses) {
+            if (unsatisfy_backjump(c, g)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     literal check_unit(const formula &f) {
         for (const clause &c: f.clauses) {
             literal result = check_unit(c);
+            if (result != 0) {
+                return result;
+            }
+        }
+        return 0;
+    }
+
+    literal check_unit_backjump(const formula &f, ImplicationGraph &g) {
+        for (const clause &c: f.clauses) {
+            literal result = check_unit_backjump(c, g);
             if (result != 0) {
                 return result;
             }
@@ -141,8 +312,19 @@ public:
         }
         return answer;
     }
-};
 
+    std::vector<literal> &getDecision() {
+        return decision;
+    }
+
+    literal back() {
+        return decision.back();
+    }
+
+    bool empty() {
+        return decision.empty();
+    }
+};
 
 class DPLL {
 public:
@@ -175,10 +357,13 @@ public:
 private:
     formula phi;
     Interpretation answer;
+    ImplicationGraph gamma;
 
     bool dfs(Interpretation d);
 
     bool dfs_stack();
+
+    bool dfs_backjump(Interpretation d, literal last_decide, int decide_level);
 };
 
 
