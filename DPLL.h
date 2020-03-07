@@ -5,6 +5,8 @@
 #ifndef DPLL_DPLL_H
 #define DPLL_DPLL_H
 
+#include <utility>
+
 #include "common.h"
 
 struct ImplicationGraph {
@@ -326,6 +328,16 @@ public:
     }
 };
 
+
+struct SearchState {
+    Interpretation interp;
+    int last_decide;
+    int decide_level;
+    ImplicationGraph graph;
+    SearchState(Interpretation i, int l, int d, ImplicationGraph g): interp(std::move(i)), last_decide(l), decide_level(d), graph(std::move(g)) {}
+};
+
+
 class DPLL {
 public:
     /**
@@ -363,7 +375,7 @@ private:
 
     bool dfs_stack();
 
-    bool dfs_backjump(Interpretation d, literal last_decide, int decide_level);
+    bool dfs_backjump();
 };
 
 

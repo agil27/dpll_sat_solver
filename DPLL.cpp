@@ -11,7 +11,7 @@ DPLL::DPLL(formula phi) : phi(std::move(phi)), answer(Interpretation(phi.num_var
 bool DPLL::check_sat() {
     //return dfs(answer);
     //return dfs_stack();
-    return dfs_backjump(answer, 0, 0);
+    return dfs_backjump();
 }
 
 model DPLL::get_model() {
@@ -71,44 +71,70 @@ bool DPLL::dfs(Interpretation d) {
     return (dfs(d.assign(split)) || dfs(d.assign(-split)));
 }
 
-bool DPLL::dfs_backjump(Interpretation d, literal last_decide, int decide_level) {
-    if (last_decide != 0) {
-        gamma.setDecision(last_decide, decide_level);
-    }
+bool DPLL::dfs_backjump() {
+    std::stack<SearchState> s;
+    s.push(SearchState(answer, 0, 0, gamma));
+    while (!s.empty()) {
+        SearchState state = s.top();
+        s.pop();
+        Interpretation d = state.interp;
+        int decide_level = state.decide_level;
+        int last_decide = state.last_decide;
+        ImplicationGraph g = state.graph;
 
-    if (d.satisfy(phi)) {
-        answer = d;
-        return true;
-    }
-    if (d.unsatisfy_backjump(phi, gamma)) {
-        auto reason = gamma.find_reason();
-        if (reason.first == 0 || reason.second == 0) {
-            return false;
+        if (last_decide != 0) {
+            g.setDecision(last_decide, decide_level);
+            if (DEBUG) {
+                printf("[trace] decide on %d\n", last_decide);
+            }
         }
-        if (DEBUG) {
-            printf("[trace] backjump on %d, %d\n", reason.first, reason.second);
+
+        if (d.satisfy(phi)) {
+            answer = d;
+            return true;
         }
-        int initial_decide_level = gamma.decisions[reason.second];
-        while (gamma.decisions[VAR(d.back())] > initial_decide_level) {
-            d = d.pop();
+
+        if (d.unsatisfy_backjump(phi, g)) {
+            auto reason = g.find_reason();
+            if (reason.first == 0 || reason.second == 0) {
+                continue;
+            }
+            if (DEBUG) {
+                printf("[trace] backjump on %d, %d\n", reason.first, reason.second);
+            }
+            while (!s.empty()) {
+                SearchState top = s.top();
+                if (VAR(top.last_decide) != reason.second) {
+                    s.pop();
+                } else {
+                    break;
+                }
+            }
+            int initial_decide_level = g.decisions[reason.second];
+            while (g.decisions[VAR(d.back())] > initial_decide_level) {
+                d = d.pop();
+            }
+            literal new_assignment = -g.parity[reason.first];
+            g.tidyup(d.getDecision());
+            d = d.assign(new_assignment);
+            g.connect(reason.second, reason.first);
+            g.setDecision(new_assignment, g.decisions[reason.second]);
+            s.push(SearchState(d, 0, g.decisions[reason.second], g));
+            continue;
         }
-        literal new_assignment = -gamma.parity[reason.first];
-        gamma.tidyup(d.getDecision());
-        d = d.assign(new_assignment);
-        gamma.connect(reason.second, reason.first);
-        gamma.setDecision(new_assignment, gamma.decisions[reason.second]);
-        return dfs_backjump(d, 0, gamma.decisions[reason.second]);
-    }
-    literal unit = d.check_unit_backjump(phi, gamma);
-    if (unit) {
-        if (DEBUG) {
-            printf("[trace] found unit %d\n", unit);
+
+        literal unit = d.check_unit_backjump(phi, g);
+        if (unit) {
+            if (DEBUG) {
+                printf("[trace] found unit %d\n", unit);
+            }
+            s.push(SearchState(d.assign(unit), 0, decide_level, g));
+            continue;
         }
-        return dfs_backjump(d.assign(unit), 0, decide_level);
+
+        literal split = d.first_atom();
+        s.push(SearchState(d.assign(-split), split, decide_level + 1, g));
+        s.push(SearchState(d.assign(split), split, decide_level + 1, g));
     }
-    literal split = d.first_atom();
-    if (DEBUG) {
-        printf("[trace] split on %d\n", split);
-    }
-    return (dfs_backjump(d.assign(split), split, decide_level + 1) || dfs_backjump(d.assign(-split), -split, decide_level + 1));
+    return false;
 }
